@@ -1,4 +1,4 @@
-# ROS
+
 import pyads
 import rospy
 from geometry_msgs.msg import Twist
@@ -6,7 +6,6 @@ from geometry_msgs.msg import Twist
 AMS_NET_ID = '5.19.158.1.1.1'  # Match this to what TwinCAT uses
 IP_ADDRESS = '192.168.0.10'     # Host IP
 
-# Command mapping
 CMD_STOP = 0
 CMD_FORWARD = 1
 CMD_BACKWARD = 2
