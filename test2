@@ -1,0 +1,66 @@
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import Twist
+import pyads
+
+# TwinCAT connection details
+AMS_NET_ID = '5.19.158.1.1.1'     # Must match what TwinCAT sees as the VM's AMS Net ID
+CX_IP = '192.168.1.50'            # IP address of the CX device
+PLC_VAR_NAME = 'move_cmd'         # The global variable in TwinCAT PLC
+
+# Velocity settings
+LIN_SPEED = 0.5
+ANG_SPEED = 1.0
+
+class TwinCATControlNode(Node):
+    def __init__(self):
+        super().__init__('twincat_control_node')
+        self.publisher_ = self.create_publisher(Twist, 'cmd_vel', 10)
+        self.timer = self.create_timer(0.1, self.publish_velocity)
+
+        # Connect to TwinCAT PLC
+        self.plc = pyads.Connection(AMS_NET_ID, pyads.PORT_TC3PLC1, CX_IP)
+        try:
+            self.plc.open()
+            self.get_logger().info("Connected to TwinCAT via ADS")
+        except Exception as e:
+            self.get_logger().error(f"Failed to connect to TwinCAT: {e}")
+
+    def publish_velocity(self):
+        msg = Twist()
+
+        try:
+            cmd = self.plc.read_by_name(PLC_VAR_NAME, pyads.PLCTYPE_INT)
+        except Exception as e:
+            self.get_logger().error(f"Failed to read from TwinCAT: {e}")
+            cmd = 0  # default to stop
+
+        if cmd == 1:  # forward
+            msg.linear.x = LIN_SPEED
+        elif cmd == 2:  # backward
+            msg.linear.x = -LIN_SPEED
+        elif cmd == 3:  # left
+            msg.angular.z = ANG_SPEED
+        elif cmd == 4:  # right
+            msg.angular.z = -ANG_SPEED
+        # else: stop (all 0)
+
+        self.publisher_.publish(msg)
+
+    def destroy_node(self):
+        self.plc.close()
+        super().destroy_node()
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = TwinCATControlNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
