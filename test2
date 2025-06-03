@@ -4,9 +4,12 @@ from geometry_msgs.msg import Twist
 import pyads
 
 # TwinCAT connection details
-AMS_NET_ID = '5.19.158.1.1.1'     # Must match what TwinCAT sees as the VM's AMS Net ID
-CX_IP = '192.168.1.50'            # IP address of the CX device
-PLC_VAR_NAME = 'move_cmd'         # The global variable in TwinCAT PLC
+AMS_NET_ID = '5.135.133.225.1.1'
+CX_IP = '192.168.4.10'
+PLC_VAR_NAME = 'GVL.move_cmd'
+
+# Set local address for connection to CX
+pyads.set_local_address('192.168.4.101.1.1')
 
 # Velocity settings
 LIN_SPEED = 0.5
@@ -19,16 +22,23 @@ class TwinCATControlNode(Node):
         self.timer = self.create_timer(0.1, self.publish_velocity)
 
         # Connect to TwinCAT PLC
-        self.plc = pyads.Connection(AMS_NET_ID, pyads.PORT_TC3PLC1, CX_IP)
+        self.plc = pyads.Connection(AMS_NET_ID, 851, CX_IP)
         try:
             self.plc.open()
             self.get_logger().info("Connected to TwinCAT via ADS")
+
+            # Check available symbols for reading
+            symbols = self.plc.get_all_symbols()
+            print("\n-- Available ADS Symbols --\n")
+            for sym in symbols:
+                print(sym.name)
+
+            self.plc.close()
         except Exception as e:
-            self.get_logger().error(f"Failed to connect to TwinCAT: {e}")
+            self.get_logger().error(f'Failed to connect to TwinCAT: {e}')
 
     def publish_velocity(self):
         msg = Twist()
-
         try:
             cmd = self.plc.read_by_name(PLC_VAR_NAME, pyads.PLCTYPE_INT)
         except Exception as e:
@@ -43,7 +53,7 @@ class TwinCATControlNode(Node):
             msg.angular.z = ANG_SPEED
         elif cmd == 4:  # right
             msg.angular.z = -ANG_SPEED
-        # else: stop (all 0)
+        # else: stop (all zero)
 
         self.publisher_.publish(msg)
 
